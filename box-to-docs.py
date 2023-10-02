@@ -9,8 +9,6 @@ from utils import WRITEUP_TEMPLATE
 
 import requests
 
-from notionx import Client
-
 
 def fetch_htb_machines(htb_token):
     # Initialize variables for pagination
@@ -68,16 +66,7 @@ def check_existing_item(notion_token, database_id, box_id):
     }
     payload = {"filter": {"property": "Box ID", "number": {"equals": box_id}}}
 
-    # Filter the database for items with the specified "Box ID"
-    # payload = {"property": "Box ID", "number": {"equals": box_id}}
-    # results = client.databases.query(database_id=database_id, filter=payload)
-
-    # Check if the results differ from the data in the machine dict to see if we need to update
-
-    # logging.info(results["results"])
-    # exit(127)
     response = requests.post(notion_api_url, headers=headers, json=payload)
-
     if response.status_code != requests.codes.ok:
         logging.error(response.text)
         logging.error(f"Failed to check for existing item with Box ID {box_id}")
@@ -231,13 +220,6 @@ if __name__ == "__main__":
         if retired_machines is None:
             logging.error("Could not fetch retired machines. Exiting.")
             exit(1)
-
-    # Creation Notion client
-    client = Client(
-        {
-            "auth_token": args.notion_token,
-        }
-    )
 
     # Update Notion database
     logging.info("Updating Notion database...")
