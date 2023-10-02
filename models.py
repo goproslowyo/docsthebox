@@ -1,8 +1,9 @@
-from typing import Dict, TypedDict, Union, Any
+from typing import Any, Dict, TypedDict, Union
 
 
-class PlayInfo(TypedDict):
-    """Type definition for playInfo attribute."""
+class MachineState(TypedDict):
+    """Information about the state of the machine."""
+
     isActive: bool
     isCompleted: bool
 
@@ -12,63 +13,74 @@ class Machine:
     Represents an HTB (Hack The Box) machine.
 
     Attributes:
-        id (int): The ID of the machine.
+        machine_id (int): The ID of the machine.
         name (str): The name of the machine.
         os (str): The operating system of the machine.
-        release (str): The release version of the machine.
-        isTodo (bool): Whether the machine is marked as "To Do".
-        difficultyText (str): The difficulty level of the machine as a text.
-        star (float): The star rating of the machine.
-        playInfo (PlayInfo): Information about the play state of the machine.
-        authUserInUserOwns (bool): Whether the authenticated user owns the user part.
-        authUserInRootOwns (bool): Whether the authenticated user owns the root part.
-        avatar (str): The avatar image URL or path for the machine.
+        release_date (str): The release date of the machine.
+        todo (bool): Whether the machine is marked as "To Do".
+        difficulty (str): The difficulty level of the machine.
+        rating (float): The rating of the machine.
+        machine_state (MachineState): Information about the state of the machine.
+        authUserInUserOwns (bool): Whether user owns the user flag.
+        authUserInRootOwns (bool): Whether user owns the root flag.
+        image (str): The avatar image URL or path for the machine.
     """
 
-    def __init__(self, id: int, name: str, os: str, release: str, isTodo: bool,
-                 difficultyText: str, star: float, playInfo: PlayInfo,
-                 authUserInUserOwns: bool, authUserInRootOwns: bool, avatar: str):
+    def __init__(
+        self,
+        machine_id: int,
+        name: str,
+        os: str,
+        release_date: str,
+        todo: bool,
+        difficulty: str,
+        rating: float,
+        machine_state: MachineState,
+        userOwned: bool,
+        rootOwned: bool,
+        image: str,
+    ):
         """
         Initializes a new instance of the Machine class.
 
         Parameters:
-            id (int): The ID of the machine.
+            machine_id (int): The ID of the machine.
             name (str): The name of the machine.
             os (str): The operating system of the machine.
-            release (str): The release version of the machine.
-            isTodo (bool): Whether the machine is marked as "To Do".
-            difficultyText (str): The difficulty level of the machine as a text.
-            star (float): The star rating of the machine.
-            playInfo (PlayInfo): Information about the play state of the machine.
-            authUserInUserOwns (bool): Whether the authenticated user owns the user part.
-            authUserInRootOwns (bool): Whether the authenticated user owns the root part.
-            avatar (str): The avatar image URL or path for the machine.
+            release_date (str): The release date of the machine.
+            todo (bool): Whether the machine is marked as "To Do".
+            difficulty (str): The difficulty level of the machine.
+            rating (float): The rating of the machine.
+            machine_state (MachineState): Information about the state of the machine.
+            authUserInUserOwns (bool): Whether user owns the user flag.
+            authUserInRootOwns (bool): Whether user owns the root flag.
+            image (str): The avatar image URL or path for the machine.
         """
 
-        self.id = id
+        self.id = machine_id
         self.name = name
         self.os = os
-        self.release = release
-        self.isTodo = isTodo
-        self.difficultyText = difficultyText
-        self.star = star
-        self.playInfo = playInfo
-        self.authUserInUserOwns = authUserInUserOwns
-        self.authUserInRootOwns = authUserInRootOwns
-        self.avatar = avatar
+        self.release_date = release_date
+        self.todo = todo
+        self.difficulty = difficulty
+        self.rating = rating
+        self.machine_state = machine_state
+        self.userOwned = userOwned
+        self.rootOwned = rootOwned
+        self.image = image
 
-    def to_dict(self) -> Dict[str, Union[Any, PlayInfo]]:
+    def to_dict(self) -> Dict[str, Union[Any, MachineState]]:
         """Convert the Machine object to a dictionary."""
         return {
-            'id': self.id,
-            'name': self.name,
-            'os': self.os,
-            'release': self.release,
-            'isTodo': self.isTodo,
-            'difficultyText': self.difficultyText,
-            'star': self.star,
-            'playInfo': self.playInfo,
-            'authUserInUserOwns': self.authUserInUserOwns,
-            'authUserInRootOwns': self.authUserInRootOwns,
-            'avatar': self.avatar
+            "id": self.id,
+            "name": self.name,
+            "os": self.os,
+            "release": self.release_date,
+            "isTodo": self.todo,
+            "difficultyText": self.difficulty,
+            "star": self.rating,
+            "playInfo": self.machine_state,
+            "authUserInUserOwns": self.userOwned,
+            "authUserInRootOwns": self.rootOwned,
+            "avatar": self.image,
         }
