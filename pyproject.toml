@@ -10,6 +10,11 @@ python = "^3.11"
 requests = "^2.31.0"
 
 
+[tool.poetry.group.dev.dependencies]
+black = "^23.9.1"
+mypy = "^1.5.1"
+types-requests = "^2.31.0.7"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
