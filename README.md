@@ -10,7 +10,11 @@ machines are stored in specified the notion database if they don't exist yet.
 
 each page has basic templates attached to help document your exploitation.
 
-## whats needed?
+## how do i use this?
+
+glad you asked -- please check out the [usage instructions](USAGE.md).
+
+## what else is needed?
 
 maybe use notionx library over raw json + requests
 
