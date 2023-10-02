@@ -1,14 +1,13 @@
 [tool.poetry]
 name = "docsthebox"
 version = "0.1.0"
-description = "HackTheBox Machines to Notion Database for Writeups"
+description = "Hack The Box Machines to Notion Database for Writeups"
 authors = ["GoProSlowYo <68455785+goproslowyo@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
 requests = "^2.31.0"
-notionx = "^0.13"
 
 
 [build-system]
