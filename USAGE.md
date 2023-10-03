@@ -36,14 +36,32 @@
 
   ![Get Hack The Box App Token](.img/htb-app-token.png)
 
+---
+
+By now you should have three things:
+
+  1. A Notion Internal Integration Secret
+
+  1. The database ID of your Notion DB
+
+  1. Your Hack The Box App Token
+
+If don't have these items please review the above steps again.
+
 - Install Poetry (you don't need poetry really, just requests, but poetry makes it easier if the project grows)
 
   - `pip install --user poetry`
 
-  - `poetry run -- box-to-docs.py --help`
+  - `oetry run python box-to-docs.py --help`
 
   or
 
   - `pip install --user requests`
 
-  - `./box-to-docs.py`
+  - `python box-to-docs.py`
+
+  or
+
+  - `docker run -v /tmp:/tmp ghcr.io/goproslowyo/docsthebox:latest --help`
+
+NOTE: Please adjust the paths accordingly if you're on windows.
