@@ -11,6 +11,8 @@ import requests
 from models import Machine
 from utils import WRITEUP_TEMPLATE
 
+NOTION_DB_CACHE: List = []
+
 
 def fetch_htb_machines() -> Optional[List[Machine]]:
     """Fetch machines from HTB.
@@ -38,17 +40,17 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
             # Convert the JSON machine data to Machine objects
             for machine_data in page_data.get("data", []):
                 machine = Machine(
-                    machine_id=machine_data["id"],
+                    id=machine_data["id"],
                     name=machine_data["name"],
                     os=machine_data["os"],
-                    release_date=machine_data["release"],
-                    todo=machine_data["isTodo"],
-                    difficulty=machine_data["difficultyText"],
-                    rating=machine_data["star"],
-                    machine_state=machine_data["playInfo"],
-                    userOwned=machine_data["authUserInUserOwns"],
-                    rootOwned=machine_data["authUserInRootOwns"],
-                    image=machine_data["avatar"],
+                    release=machine_data["release"],
+                    isTodo=machine_data["isTodo"],
+                    difficultyText=machine_data["difficultyText"],
+                    star=machine_data["star"],
+                    playInfo=machine_data["playInfo"],
+                    authUserInUserOwns=machine_data["authUserInUserOwns"],
+                    authUserInRootOwns=machine_data["authUserInRootOwns"],
+                    avatar=machine_data["avatar"],
                 )
                 machines.append(machine)
 
@@ -75,7 +77,7 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
             return None
 
     # Write the collected machine data to a JSON file for debugging
-    with open("retired-machines.json", "w") as f:
+    with open("/tmp/retired-machines.json", "w") as f:
         json.dump([machine.to_dict() for machine in machines], f, indent=2)
 
     return machines
@@ -96,15 +98,48 @@ def check_existing_item(machine_id: int) -> bool:
         "Content-Type": "application/json",
         "Notion-Version": "2022-06-28",
     }
-    payload = {"filter": {"property": "Box ID", "number": {"equals": machine_id}}}
+    # payload = {"filter": {"property": "Box ID", "number": {"equals": machine_id}}}
 
-    response = requests.post(notion_api_url, headers=headers, json=payload)
+    # response = requests.post(notion_api_url, headers=headers, json=payload)
+    # If existing_machines is not empty, check if machine_id exists in the list
+    if len(NOTION_DB_CACHE) > 0:
+        for item in NOTION_DB_CACHE:
+            if (
+                item["properties"]["Box ID"]["number"] == machine_id
+                and item["object"] == "page"
+            ):
+                return True
+        return False
+    # Otherwise, make a request to the Notion API
+    response = requests.post(notion_api_url, headers=headers)
     if response.status_code != requests.codes.ok:
         logging.error(response.text)
         logging.error(f"Failed to check for existing item with Box ID {machine_id}")
         return False
 
     data = response.json().get("results", [])
+    # Check for has_more and fetch the rest until done
+    while response.json().get("has_more"):
+        logging.debug(f"has_more: {response.json().get('has_more')}")
+        logging.debug(f"start_cursor: {response.json().get('next_cursor')}")
+        response = requests.post(
+            notion_api_url,
+            headers=headers,
+            json={"start_cursor": response.json().get("next_cursor")},
+        )
+        data.extend(response.json().get("results", []))
+    # Add all items to ITEMS_IN_NOTION_DB as a client hot-cache
+    for item in data:
+        if item["object"] == "page":
+            NOTION_DB_CACHE.append(item)
+
+    # Check if machine_id exists in the results
+    data = [
+        item
+        for item in data
+        if item["properties"]["Box ID"]["number"] == machine_id
+        and item["object"] == "page"
+    ]
     return len(data) > 0  # If there are results, an item with the Box ID already exists
 
 
@@ -121,19 +156,17 @@ def update_notion_database(machines: List[Machine]) -> None:
         "Notion-Version": "2022-06-28",
     }
 
-
     for machine in machines:
-        machine_id = int(machine["id"])
-        machine_name = machine["name"]
+        machine_id = int(machine.id)
+        machine_name = machine.name
         logging.debug(f"machine: {machine}")
         logging.debug(f"Box Name: {machine_name}\nBox ID: {machine_id}")
 
         # Check if an item with the same Box ID already exists in the database
         if check_existing_item(machine_id):
-            logging.warn(
+            logging.warning(
                 f"Item with Box ID {machine_id} for {machine_name} already exists. Skipping."
             )
-            sleep(0.5)
             continue
 
         child_blocks = [block for block in WRITEUP_TEMPLATE]
@@ -142,23 +175,23 @@ def update_notion_database(machines: List[Machine]) -> None:
             "parent": {"database_id": args.database_id, "type": "database_id"},
             "icon": {
                 "type": "external",
-                "external": {"url": f"https://www.hackthebox.com{machine['avatar']}"},
+                "external": {"url": f"https://www.hackthebox.com{machine.avatar}"},
             },
             "cover": {
                 "type": "external",
-                "external": {"url": f"https://www.hackthebox.com{machine['avatar']}"},
+                "external": {"url": f"https://www.hackthebox.com{machine.avatar}"},
             },
             "properties": {
-                "Name": {"title": [{"text": {"content": machine.name}}]},
+                "Name": {"title": [{"text": {"content": machine_name}}]},
                 "Box ID": {"number": int(machine_id)},
-                "OS": {"select": {"name": machine["os"]}},
-                "Release Date": {"date": {"start": machine["release"]}},
-                "To Do?": {"checkbox": machine["isTodo"]},
-                "Difficulty": {"select": {"name": machine["difficultyText"]}},
-                "Rating": {"number": float(machine["star"])},
-                "Active?": {"checkbox": machine["playInfo"]["isActive"] or False},
-                "$": {"checkbox": machine["authUserInUserOwns"] or False},
-                "#": {"checkbox": machine["authUserInRootOwns"] or False},
+                "OS": {"select": {"name": machine.os}},
+                "Release Date": {"date": {"start": machine.release}},
+                "To Do?": {"checkbox": machine.isTodo},
+                "Difficulty": {"select": {"name": machine.difficultyText}},
+                "Rating": {"number": float(machine.star)},
+                "Active?": {"checkbox": machine.playInfo["isActive"] or False},
+                "$": {"checkbox": machine.authUserInUserOwns or False},
+                "#": {"checkbox": machine.authUserInRootOwns or False},
             },
             "children": child_blocks,
         }
@@ -194,12 +227,18 @@ if __name__ == "__main__":
 
     # Argument parsing
     # TODO(gpsy): Make these read env vars instead of passing secrets as args
-    parser = argparse.ArgumentParser(description="docsthebox: HTB Machines to Notion DB for Writeups")
-    parser.add_argument("--htb-token", required=False, help="Your HTB Bearer Token")
+    parser = argparse.ArgumentParser(
+        description="docsthebox: HTB Machines to Notion DB for Writeups"
+    )
+    parser.add_argument("--htb-token", required=True, help="Your HTB Bearer Token")
     parser.add_argument("--notion-token", required=True, help="Your Notion API Token")
-    parser.add_argument("--database-id", required=True, help="Notion Database where machines will be created")
+    parser.add_argument("--database-id", required=True, help="Notion Database to update")
     # Flag to skip HTB api calls and use local json file
-    parser.add_argument("--local", action="store_true", help="Skip HTB API calls and use local JSON file instead")
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Skip HTB API calls and use local JSON file instead",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
@@ -216,13 +255,15 @@ if __name__ == "__main__":
     if args.local:
         # Check if local file exists
         try:
-            with open("retired-machines.json", "r") as f:
+            with open("/tmp/retired-machines.json", "r") as f:
                 logging.info(
                     "Skipping HTB API calls and using local JSON file instead."
                 )
                 machines = json.load(f)
                 # print length
                 logging.info(f"Loaded {len(machines)} Retired machines")
+                # For each machine, create a Machine object and load into machines list
+                machines = [Machine(**machine) for machine in machines]
         # if not exists warn and use fetch_htb_machines
         except FileNotFoundError:
             logging.warning("Local JSON file not found. Fetching from HTB...")
@@ -233,7 +274,7 @@ if __name__ == "__main__":
     else:
         # Let the user know about the --local flag if a machines json file is found
         try:
-            with open("retired-machines.json", "r") as f:
+            with open("/tmp/retired-machines.json", "r") as f:
                 logging.info(
                     "!!! HINT: Found local JSON file. Use --local flag to skip the slow HTB API calls!"
                 )
@@ -248,5 +289,7 @@ if __name__ == "__main__":
 
     # Update Notion database
     logging.info("Updating Notion database...")
+    logging.info("This is going to take a while. Go grab a coffee.")
+    logging.info("We slow this down to avoid hitting Notion API rate limits.")
     update_notion_database(machines)
     logging.info("Finished updating the Notion database with retired HTB machines.")
