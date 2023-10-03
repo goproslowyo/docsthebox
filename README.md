@@ -14,6 +14,12 @@ each page has basic templates attached to help document your exploitation.
 
 glad you asked -- please check out the [usage instructions](USAGE.md).
 
+you *will* need to set some things up so please read it.
+
+easiest is to run the docker container if you have docker, otherwise run the python code.
+
+sorry windows users, you might have to changes some paths. or just run the docker container.
+
 ## what else is needed?
 
 maybe use notionx library over raw json + requests
