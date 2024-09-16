@@ -320,13 +320,13 @@ files = [
 
 [[package]]
 name = "types-requests"
-version = "2.31.0.7"
+version = "2.32.0.20240914"
 description = "Typing stubs for requests"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "types-requests-2.31.0.7.tar.gz", hash = "sha256:4d930dcabbc2452e3d70728e581ac4ac8c2d13f62509ad9114673f542af8cb4e"},
-    {file = "types_requests-2.31.0.7-py3-none-any.whl", hash = "sha256:39844effefca88f4f824dcdc4127b813d3b86a56b2248d3d1afa58832040d979"},
+    {file = "types-requests-2.32.0.20240914.tar.gz", hash = "sha256:2850e178db3919d9bf809e434eef65ba49d0e7e33ac92d588f4a5e295fffd405"},
+    {file = "types_requests-2.32.0.20240914-py3-none-any.whl", hash = "sha256:59c2f673eb55f32a99b2894faf6020e1a9f4a402ad0f192bfee0b64469054310"},
 ]
 
 [package.dependencies]
@@ -363,4 +363,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "cbffa5c1eb9cdc0affee13ad1dd60824ee48ca74b9bf094104c3ae27396ede98"
+content-hash = "299c1cd7de1de8f38c97e70c8150b13c4d456bea689e389a764ccb7cd9fd0ec9"
