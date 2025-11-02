@@ -27,7 +27,8 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
     machines: List[Machine] = []
 
     while True:
-        htb_url = f"https://www.hackthebox.com/api/v4/machine/list/retired/paginated?per_page={per_page}&page={current_page}"
+        htb_url = f"https://labs.hackthebox.com/api/v4/machine/list/retired/paginated?per_page={per_page}&page={current_page}"
+        
         headers = {
             "Authorization": f"Bearer {args.htb_token}",
             "user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/118.0",
@@ -175,11 +176,11 @@ def update_notion_database(machines: List[Machine]) -> None:
             "parent": {"database_id": args.database_id, "type": "database_id"},
             "icon": {
                 "type": "external",
-                "external": {"url": f"https://www.hackthebox.com{machine.avatar}"},
+                "external": {"url": f"https://labs.hackthebox.com/storage/{machine.avatar}"},
             },
             "cover": {
                 "type": "external",
-                "external": {"url": f"https://www.hackthebox.com{machine.avatar}"},
+                "external": {"url": f"https://labs.hackthebox.com/storage/{machine.avatar}"},
             },
             "properties": {
                 "Name": {"title": [{"text": {"content": machine_name}}]},
