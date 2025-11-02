@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import argparse
 import json
 import logging
@@ -30,7 +31,7 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
         htb_url = f"https://labs.hackthebox.com/api/v4/machine/list/retired/paginated?per_page={per_page}&page={current_page}"
         
         headers = {
-            "Authorization": f"Bearer {args.htb_token}",
+            "Authorization": f"Bearer {htb_token}",
             "user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/118.0",
         }
         response = requests.get(htb_url, headers=headers)
@@ -95,7 +96,7 @@ def check_existing_item(machine_id: int) -> bool:
     """
     notion_api_url = f"https://api.notion.com/v1/databases/{args.database_id}/query"
     headers = {
-        "Authorization": f"Bearer {args.notion_token}",
+        "Authorization": f"Bearer {notion_token}",
         "Content-Type": "application/json",
         "Notion-Version": "2022-06-28",
     }
@@ -152,7 +153,7 @@ def update_notion_database(machines: List[Machine]) -> None:
     """
     notion_api_url = f"https://api.notion.com/v1/pages"
     headers = {
-        "Authorization": f"Bearer {args.notion_token}",
+        "Authorization": f"Bearer {notion_token}",
         "Content-Type": "application/json",
         "Notion-Version": "2022-06-28",
     }
@@ -227,12 +228,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Argument parsing
-    # TODO(gpsy): Make these read env vars instead of passing secrets as args
     parser = argparse.ArgumentParser(
         description="docsthebox: HTB Machines to Notion DB for Writeups"
     )
-    parser.add_argument("--htb-token", required=True, help="Your HTB Bearer Token")
-    parser.add_argument("--notion-token", required=True, help="Your Notion API Token")
     parser.add_argument("--database-id", required=True, help="Notion Database to update")
     # Flag to skip HTB api calls and use local json file
     parser.add_argument(
@@ -247,10 +245,19 @@ if __name__ == "__main__":
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Return an error is HTB token not set but local flag is not set
-    if not args.htb_token and not args.local:
-        logging.error("HTB Token not set. Exiting.")
+    # HTB and Notion token are read from environment variables
+    htb_token = os.getenv("HTB_TOKEN")
+    notion_token = os.getenv("NOTION_TOKEN")
+
+    # Check if tokens are set in environment variables
+    if not htb_token and not args.local:
+        logging.error("HTB Token not set in environment variables. Exiting.")
         exit(1)
+
+    if not notion_token:
+        logging.error("Notion Token not set in environment variables. Exiting.")
+        exit(1)
+
 
     # Check if local flag is set
     if args.local:
