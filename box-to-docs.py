@@ -13,6 +13,18 @@ from models import Machine
 from utils import WRITEUP_TEMPLATE
 
 NOTION_DB_CACHE: List = []
+HTB_STORAGE_URL = "https://labs.hackthebox.com/storage"
+
+
+def htb_avatar_url(avatar: str) -> str:
+    """Build a full avatar URL whether HTB returns "/storage/avatars/x.png",
+    "avatars/x.png" or an absolute URL."""
+    if avatar.startswith(("http://", "https://")):
+        return avatar
+    path = avatar.lstrip("/")
+    if path.startswith("storage/"):
+        path = path[len("storage/"):]
+    return f"{HTB_STORAGE_URL}/{path}"
 
 
 def fetch_htb_machines() -> Optional[List[Machine]]:
@@ -29,7 +41,6 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
 
     while True:
         htb_url = f"https://labs.hackthebox.com/api/v4/machine/list/retired/paginated?per_page={per_page}&page={current_page}"
-        
         headers = {
             "Authorization": f"Bearer {htb_token}",
             "user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/118.0",
@@ -177,11 +188,11 @@ def update_notion_database(machines: List[Machine]) -> None:
             "parent": {"database_id": args.database_id, "type": "database_id"},
             "icon": {
                 "type": "external",
-                "external": {"url": f"https://labs.hackthebox.com/storage/{machine.avatar}"},
+                "external": {"url": htb_avatar_url(machine.avatar)},
             },
             "cover": {
                 "type": "external",
-                "external": {"url": f"https://labs.hackthebox.com/storage/{machine.avatar}"},
+                "external": {"url": htb_avatar_url(machine.avatar)},
             },
             "properties": {
                 "Name": {"title": [{"text": {"content": machine_name}}]},
