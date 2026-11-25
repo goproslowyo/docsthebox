@@ -47,9 +47,10 @@ By now you should have three things:
   1. Your Hack The Box App Token
 
 If don't have these items please review the above steps again.
+
 - Configure HTB_TOKEN and NOTION_TOKEN as environment variables.
   - `export HTB_TOKEN="YOUR_HTB_TOKEN"`
-  - `export NOTION_TOKEN="YOUR_NOTION_TOKEN`
+  - `export NOTION_TOKEN="YOUR_NOTION_TOKEN"`
 
 - Install Poetry (you don't need poetry really, just requests, but poetry makes it easier if the project grows)
 
@@ -61,10 +62,10 @@ If don't have these items please review the above steps again.
 
   - `pip install --user requests`
 
-  - `python box-to-docs.py`
+  - `python box-to-docs.py --database-id YOUR_DATABASE_ID`
 
   or
 
-  - `docker run -v /tmp:/tmp ghcr.io/goproslowyo/docsthebox:latest --help`
+  - `docker run -e HTB_TOKEN -e NOTION_TOKEN -v /tmp:/tmp ghcr.io/goproslowyo/docsthebox:latest --database-id YOUR_DATABASE_ID`
 
 NOTE: Please adjust the paths accordingly if you're on windows.
