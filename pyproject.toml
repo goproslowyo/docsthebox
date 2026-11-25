@@ -6,12 +6,12 @@ authors = ["GoProSlowYo <68455785+goproslowyo@users.noreply.github.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 requests = "^2.32.3"
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.9.1"
+black = "^25.0"
 mypy = "^1.5.1"
 types-requests = "^2.31.0.7"
 
