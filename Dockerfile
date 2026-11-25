@@ -1,10 +1,15 @@
 # Build the python code into a Chainguard python image
-FROM cgr.dev/chainguard/python:latest-dev as builder
+FROM cgr.dev/chainguard/python:latest-dev AS builder
+WORKDIR /app
+RUN python -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade requests
+
 FROM cgr.dev/chainguard/python:latest
 WORKDIR /app
-COPY --from=builder /home/nonroot/.local/lib/python3.12/site-packages /home/nonroot/.local/lib/python3.12/site-packages
-COPY *.py /app/
+COPY --from=builder /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+COPY box-to-docs.py models.py utils.py /app/
 ENTRYPOINT [ "python", "/app/box-to-docs.py" ]
 LABEL org.opencontainers.image.authors='goproslowyo, ritchies'
 LABEL org.opencontainers.image.description="HackTheBox Machines to Notion Database for Writeups"
