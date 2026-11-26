@@ -3,18 +3,52 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+  build:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      # main -> :latest; a v* tag (cut a GitHub release) -> :vX.Y.Z and :latest
       - name: Build Docker image
-        run: docker build -t ghcr.io/${{ github.repository }}:latest .
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+          TAGS="-t $IMAGE:latest"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAGS="$TAGS -t $IMAGE:${{ github.ref_name }}"
+          fi
+          docker build $TAGS .
 
       - name: Push Docker image to GHCR
-        run: docker push ghcr.io/${{ github.repository }}:latest
+        run: docker push --all-tags ghcr.io/${{ github.repository }}
