@@ -68,4 +68,8 @@ If don't have these items please review the above steps again.
 
   - `docker run -e HTB_TOKEN -e NOTION_TOKEN -v /tmp:/tmp ghcr.io/goproslowyo/docsthebox:latest --database-id YOUR_DATABASE_ID`
 
+Boxes already in your database are never duplicated or rewritten. If HTB has moved a box's image (which leaves old pages with blank art), the next run points that page's icon and cover at the new image. Icons and covers you set yourself (emoji, uploads, other sites) are left alone.
+
+Add `--dry-run` to see what would be created or repaired without changing anything.
+
 NOTE: Please adjust the paths accordingly if you're on windows.

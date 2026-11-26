@@ -5,7 +5,8 @@ import argparse
 import json
 import logging
 from time import sleep
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -13,7 +14,11 @@ from models import Machine
 from utils import WRITEUP_TEMPLATE
 
 NOTION_DB_CACHE: List = []
+NOTION_DB_LOADED = False
 HTB_STORAGE_URL = "https://labs.hackthebox.com/storage"
+# Hosts HTB has served box art from. Page art pointing anywhere else was set
+# by the user and is never touched.
+HTB_ART_HOSTS = ("hackthebox.com", "hackthebox.eu", "htb.systems")
 
 
 def htb_avatar_url(avatar: str) -> str:
@@ -23,8 +28,70 @@ def htb_avatar_url(avatar: str) -> str:
         return avatar
     path = avatar.lstrip("/")
     if path.startswith("storage/"):
-        path = path[len("storage/"):]
+        path = path[len("storage/") :]
     return f"{HTB_STORAGE_URL}/{path}"
+
+
+def notion_headers() -> Dict[str, str]:
+    return {
+        "Authorization": f"Bearer {notion_token}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+
+
+def notion_request(method: str, url: str, **kwargs: Any) -> requests.Response:
+    """Call the Notion API, retrying on rate limits and server errors."""
+    response = requests.request(method, url, headers=notion_headers(), **kwargs)
+    for attempt in range(1, 4):
+        if response.status_code != 429 and response.status_code < 500:
+            break
+        delay = float(response.headers.get("Retry-After", attempt))
+        logging.warning(f"Notion returned {response.status_code}, retrying in {delay}s")
+        sleep(delay)
+        response = requests.request(method, url, headers=notion_headers(), **kwargs)
+    return response
+
+
+def is_htb_art_url(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in HTB_ART_HOSTS)
+
+
+def art_is_stale(art: Optional[Dict[str, Any]], art_url: str) -> bool:
+    """True if an icon/cover is HTB box art that differs from art_url (HTB has
+    moved its images more than once, which leaves old pages pointing at dead
+    links). Missing art, emoji, uploaded files and images from anywhere else
+    are the user's choice and never touched."""
+    if not art or art.get("type") != "external":
+        return False
+    current = art.get("external", {}).get("url", "")
+    return current != art_url and is_htb_art_url(current)
+
+
+def art_needs_repair(page: Dict[str, Any], art_url: str) -> bool:
+    return any(art_is_stale(page.get(key), art_url) for key in ("icon", "cover"))
+
+
+def repair_page_art(page: Dict[str, Any], art_url: str) -> bool:
+    """Point a page's HTB icon and cover at art_url. Returns True on success."""
+    payload = {
+        key: {"type": "external", "external": {"url": art_url}}
+        for key in ("icon", "cover")
+        if art_is_stale(page.get(key), art_url)
+    }
+    if not payload:
+        return True
+    if args.dry_run:
+        logging.info(f"[dry run] would update {', '.join(payload)} on {page['id']}")
+        return True
+    response = notion_request(
+        "PATCH", f"https://api.notion.com/v1/pages/{page['id']}", json=payload
+    )
+    if response.status_code != requests.codes.ok:
+        logging.error(f"Failed to update art on page {page['id']}: {response.text}")
+        return False
+    return True
 
 
 def fetch_htb_machines() -> Optional[List[Machine]]:
@@ -96,90 +163,74 @@ def fetch_htb_machines() -> Optional[List[Machine]]:
     return machines
 
 
-def check_existing_item(machine_id: int) -> bool:
-    """Checks if an item with a specific Box ID exists in the Notion database.
-
-    Args:
-        machine_id (int): The Box ID to check for.
-
-    Returns:
-        bool: True if the item exists, False otherwise.
-    """
+def load_notion_db() -> bool:
+    """Fetch every page in the database into NOTION_DB_CACHE once."""
+    global NOTION_DB_LOADED
+    if NOTION_DB_LOADED:
+        return True
     notion_api_url = f"https://api.notion.com/v1/databases/{args.database_id}/query"
-    headers = {
-        "Authorization": f"Bearer {notion_token}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28",
-    }
-    # payload = {"filter": {"property": "Box ID", "number": {"equals": machine_id}}}
-
-    # response = requests.post(notion_api_url, headers=headers, json=payload)
-    # If existing_machines is not empty, check if machine_id exists in the list
-    if len(NOTION_DB_CACHE) > 0:
-        for item in NOTION_DB_CACHE:
-            if (
-                item["properties"]["Box ID"]["number"] == machine_id
-                and item["object"] == "page"
-            ):
-                return True
-        return False
-    # Otherwise, make a request to the Notion API
-    response = requests.post(notion_api_url, headers=headers)
-    if response.status_code != requests.codes.ok:
-        logging.error(response.text)
-        logging.error(f"Failed to check for existing item with Box ID {machine_id}")
-        return False
-
-    data = response.json().get("results", [])
-    # Check for has_more and fetch the rest until done
-    while response.json().get("has_more"):
-        logging.debug(f"has_more: {response.json().get('has_more')}")
-        logging.debug(f"start_cursor: {response.json().get('next_cursor')}")
-        response = requests.post(
-            notion_api_url,
-            headers=headers,
-            json={"start_cursor": response.json().get("next_cursor")},
+    body: Dict[str, Any] = {}
+    while True:
+        response = notion_request("POST", notion_api_url, json=body)
+        if response.status_code != requests.codes.ok:
+            logging.error(response.text)
+            logging.error("Failed to read the Notion database")
+            return False
+        data = response.json()
+        NOTION_DB_CACHE.extend(
+            item for item in data.get("results", []) if item["object"] == "page"
         )
-        data.extend(response.json().get("results", []))
-    # Add all items to ITEMS_IN_NOTION_DB as a client hot-cache
-    for item in data:
-        if item["object"] == "page":
-            NOTION_DB_CACHE.append(item)
+        if not data.get("has_more"):
+            break
+        body = {"start_cursor": data.get("next_cursor")}
+    NOTION_DB_LOADED = True
+    logging.debug(f"Loaded {len(NOTION_DB_CACHE)} pages from Notion")
+    return True
 
-    # Check if machine_id exists in the results
-    data = [
+
+def find_existing_items(machine_id: int) -> List[Dict[str, Any]]:
+    """Return every database page with this Box ID."""
+    return [
         item
-        for item in data
-        if item["properties"]["Box ID"]["number"] == machine_id
-        and item["object"] == "page"
+        for item in NOTION_DB_CACHE
+        if item["properties"].get("Box ID", {}).get("number") is not None
+        and int(item["properties"]["Box ID"]["number"]) == machine_id
     ]
-    return len(data) > 0  # If there are results, an item with the Box ID already exists
 
 
 def update_notion_database(machines: List[Machine]) -> None:
-    """Updates a Notion database with the list of HTB machines skipping any existing machines found by machine_id.
+    """Adds HTB machines missing from the Notion database and repairs stale
+    box art on the ones already there.
 
     Args:
         machines (List[Machine]): A list of Machine objects.
     """
-    notion_api_url = f"https://api.notion.com/v1/pages"
-    headers = {
-        "Authorization": f"Bearer {notion_token}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28",
-    }
+    notion_api_url = "https://api.notion.com/v1/pages"
+    if not load_notion_db():
+        exit(1)
 
+    created = repaired = failed = 0
     for machine in machines:
         machine_id = int(machine.id)
         machine_name = machine.name
         logging.debug(f"machine: {machine}")
         logging.debug(f"Box Name: {machine_name}\nBox ID: {machine_id}")
 
-        # Check if an item with the same Box ID already exists in the database
-        if check_existing_item(machine_id):
-            logging.warning(
-                f"Item with Box ID {machine_id} for {machine_name} already exists. Skipping."
-            )
+        art_url = htb_avatar_url(machine.avatar)
+
+        # Existing pages keep their content; only stale box art is repaired
+        existing = find_existing_items(machine_id)
+        if existing:
+            for page in existing:
+                if not art_needs_repair(page, art_url):
+                    continue
+                logging.info(f"Repairing box art for {machine_name}")
+                if repair_page_art(page, art_url):
+                    repaired += 1
+                else:
+                    failed += 1
+                if not args.dry_run:
+                    sleep(0.35)
             continue
 
         child_blocks = [block for block in WRITEUP_TEMPLATE]
@@ -188,11 +239,11 @@ def update_notion_database(machines: List[Machine]) -> None:
             "parent": {"database_id": args.database_id, "type": "database_id"},
             "icon": {
                 "type": "external",
-                "external": {"url": htb_avatar_url(machine.avatar)},
+                "external": {"url": art_url},
             },
             "cover": {
                 "type": "external",
-                "external": {"url": htb_avatar_url(machine.avatar)},
+                "external": {"url": art_url},
             },
             "properties": {
                 "Name": {"title": [{"text": {"content": machine_name}}]},
@@ -210,28 +261,23 @@ def update_notion_database(machines: List[Machine]) -> None:
         }
         logging.debug(f"payload: {payload}")
 
-        # todo(gpsy): Use NotionX client instead of requests
-        response = requests.post(notion_api_url, headers=headers, json=payload)
-        if response:
-            logging.debug(response.status_code)
-            logging.debug(response.headers)
-            logging.debug(response.text)
-        # Retry up to 3 times if the request fails
+        if args.dry_run:
+            logging.info(f"[dry run] would create {machine_name}")
+            created += 1
+            continue
+        response = notion_request("POST", notion_api_url, json=payload)
         if response.status_code != requests.codes.ok:
-            retry = 0
             logging.error(response.text)
-            logging.error(
-                f"Failed to update Notion database for machine {machine_name}"
-            )
-            while retry < 3:
-                sleep(1)
-                logging.info(f"Retrying update for machine {machine_name}")
-                response = requests.post(notion_api_url, headers=headers, json=payload)
-                if response.status_code == requests.codes.ok:
-                    break
-                retry += 1
-            break
-        sleep(0.5)
+            logging.error(f"Failed to add {machine_name} to the Notion database")
+            failed += 1
+            continue
+        created += 1
+        sleep(0.35)
+
+    logging.info(
+        f"{'[dry run] ' if args.dry_run else ''}"
+        f"Created {created}, repaired art on {repaired}, failed {failed}."
+    )
 
 
 if __name__ == "__main__":
@@ -242,12 +288,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="docsthebox: HTB Machines to Notion DB for Writeups"
     )
-    parser.add_argument("--database-id", required=True, help="Notion Database to update")
+    parser.add_argument(
+        "--database-id", required=True, help="Notion Database to update"
+    )
     # Flag to skip HTB api calls and use local json file
     parser.add_argument(
         "--local",
         action="store_true",
         help="Skip HTB API calls and use local JSON file instead",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be created or repaired without changing Notion",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
@@ -268,7 +321,6 @@ if __name__ == "__main__":
     if not notion_token:
         logging.error("Notion Token not set in environment variables. Exiting.")
         exit(1)
-
 
     # Check if local flag is set
     if args.local:
